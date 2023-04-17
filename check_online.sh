@@ -1,51 +1,50 @@
 #!/bin/bash
-echo -e "time\t\t\tinternet\trouter\tprevious duration (seconds)"
+
+INTERNET_IP="8.8.4.4"
+ROUTER_IP="192.168.1.1"
+
+echo -e "time\t\t\tinternet\trouter\tduration (seconds)"
 TIMESTAMP=`date +%s`
-ping -c 1 -W 0.7 8.8.4.4 > /dev/null 2>&1
-if [ $? -eq 0 ] ; then
-    echo -e "`date +%Y-%m-%dT%H:%M:%S%Z`\tonline\t\tonline\tn/a";
-    INTERNET_STATUS="UP"
+
+# initialize the program
+ping -c 1 -W 0.7 $INTERNET_IP > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    INTERNET_STATUS="online"
 else
-    INTERNET_STATUS="DOWN"
-    ping -c 1 -W 0.7 192.168.1.1 > /dev/null 2>&1
-    if [ $? -eq 0] ; then
-        echo -e "`date +%Y-%m-%dT%H:%M:%S%Z`\toffline\t\tonline\tn/a"
-        ROUTER_STATUS="UP"
-    else
-        echo -e "`date +%Y-%m-%dT%H:%M:%S%Z`\toffline\t\toffline\tn/a"
-        ROUTER_STATUS="DOWN"
-    fi
-    
+    INTERNET_STATUS="offline"
 fi
+ping -c 1 -W 0.7 $ROUTER_IP > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    ROUTER_STATUS="online"
+else
+    ROUTER_STATUS="offline"
+fi
+echo -en "`date +%Y-%m-%dT%H:%M:%S%Z`\t$INTERNET_STATUS\t\t$ROUTER_STATUS\t"
+
+# check status every second until finished
 while [ 1 ]
  do
-    ping -c 1 -W 0.7 8.8.4.4 > /dev/null 2>&1
+    # check for internet connection
+    ping -c 1 -W 0.7 $INTERNET_IP > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-        if [ "$INTERNET_STATUS" != "UP" ]; then
-            echo -e "`date +%Y-%m-%dT%H:%M:%S%Z`\tonline\t\tonline\t$((`date +%s`-$TIMESTAMP))"
-            INTERNET_STATUS="UP"
-            TIMESTAMP=`date +%s`
-        fi
+        NEW_INTERNET_STATUS="online"
     else
-        if [ "$INTERNET_STATUS" = "UP" ]; then
-            ping -c 1 -W 0.7 192.168.1.1 > /dev/null 2>&1
-            if [ $? -eq 0 ]; then
-                if [ "$ROUTER_STATUS" != "UP" ]; then
-                    echo -e "`date +%Y-%m-%dT%H:%M:%S%Z`\toffline\t\tonline\t$((`date +%s`-$TIMESTAMP))"
-                    ROUTER_STATUS="UP"
-                    INTERNET_STATUS="DOWN"
-                    TIMESTAMP=`date +%s`
-                fi
-            else
-                if [ "$ROUTER_STATUS" = "UP" ]; then
-                    echo -e "`date +%Y-%m-%dT%H:%M:%S%Z`\toffline\t\toffline\t$((`date +%s`-$TIMESTAMP))"
-                    ROUTER_STATUS="DOWN"
-                    INTERNET_STATUS="DOWN"
-                    TIMESTAMP=`date +%s`
-                fi
-            fi
-        echo "internet not connected with status up"
-        fi
+        NEW_INTERNET_STATUS="offline"
     fi
+    # check for router connection
+    ping -c 1 -W 0.7 $ROUTER_IP > /dev/null 2>&1 # adjust router IP address here
+    if [ $? -eq 0 ]; then
+        NEW_ROUTER_STATUS="online"
+    else
+        NEW_ROUTER_STATUS="offline"
+    fi
+    # if the status is different than before, print the amount of time on the previous status and the new status
+    if [[ ! ( $INTERNET_STATUS = $NEW_INTERNET_STATUS && $ROUTER_STATUS = $NEW_ROUTER_STATUS ) ]]; then
+        INTERNET_STATUS=$NEW_INTERNET_STATUS
+        ROUTER_STATUS=$NEW_ROUTER_STATUS
+        echo -en "$((`date +%s`-$TIMESTAMP))\n`date +%Y-%m-%dT%H:%M:%S%Z`\t$INTERNET_STATUS\t\t$ROUTER_STATUS\t"
+        TIMESTAMP=`date +%s`
+    fi
+    # wait 1 second before retrying
     sleep 1
  done;
